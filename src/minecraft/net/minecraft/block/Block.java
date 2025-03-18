@@ -2,11 +2,16 @@ package net.minecraft.block;
 
 import java.util.List;
 import java.util.Random;
+
+import jp.client.Client;
+import jp.client.event.BlockAABBEvent;
+import jp.client.module.impl.visual.Xray;
 import net.minecraft.block.material.MapColor;
 import net.minecraft.block.material.Material;
 import net.minecraft.block.properties.IProperty;
 import net.minecraft.block.state.BlockState;
 import net.minecraft.block.state.IBlockState;
+import net.minecraft.client.Minecraft;
 import net.minecraft.creativetab.CreativeTabs;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.entity.Entity;
@@ -388,9 +393,20 @@ public class Block
     {
         AxisAlignedBB axisalignedbb = this.getCollisionBoundingBox(worldIn, pos, state);
 
-        if (axisalignedbb != null && mask.intersectsWith(axisalignedbb))
-        {
-            list.add(axisalignedbb);
+        if (collidingEntity == Minecraft.getMinecraft().thePlayer) {
+            final BlockAABBEvent event = new BlockAABBEvent(worldIn, this, pos, axisalignedbb, mask);
+            Client.eventBus.register(event);
+
+            if (event.getCanceled()) return;
+
+            if (event.getBoundingBox() != null && event.getMaskBoundingBox().intersectsWith(event.getBoundingBox())) {
+                list.add(event.getBoundingBox());
+            }
+        } else {
+            if (axisalignedbb != null && mask.intersectsWith(axisalignedbb))
+            {
+                list.add(axisalignedbb);
+            }
         }
     }
 
@@ -664,7 +680,7 @@ public class Block
 
     public EnumWorldBlockLayer getBlockLayer()
     {
-        return EnumWorldBlockLayer.SOLID;
+        return Client.moduleManager.get(Xray.class).isToggled() ? EnumWorldBlockLayer.TRANSLUCENT : EnumWorldBlockLayer.SOLID;
     }
 
     public boolean canReplace(World worldIn, BlockPos pos, EnumFacing side, ItemStack stack)
@@ -874,6 +890,9 @@ public class Block
 
     public float getAmbientOcclusionLightValue()
     {
+        if (Client.moduleManager.get(Xray.class).isToggled())
+            return 1.0F;
+
         return this.isBlockNormalCube() ? 0.2F : 1.0F;
     }
 

@@ -3,6 +3,8 @@ package net.minecraft.client.gui;
 import com.google.common.collect.Lists;
 import java.util.Iterator;
 import java.util.List;
+
+import jp.client.util.math.MathUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.entity.player.EntityPlayer;
@@ -22,13 +24,33 @@ public class GuiNewChat extends Gui
     private int scrollPos;
     private boolean isScrolled;
 
+    private static float percentage = 0F;
+    public static long prevMillis = -1;
+
     public GuiNewChat(Minecraft mcIn)
     {
         this.mc = mcIn;
     }
 
+    public static void updatePercentage(long diff) {
+        if (percentage < 1) percentage += 0.004F * diff;
+        percentage = MathUtil.INSTANCE.clamp(percentage, 0F, 1F);
+    }
+
     public void drawChat(int updateCounter)
     {
+        if (prevMillis == -1) {
+            prevMillis = System.currentTimeMillis();
+            return;
+        }
+        long current = System.currentTimeMillis();
+        long diff = current - prevMillis;
+        prevMillis = current;
+        updatePercentage(diff);
+        float t = percentage;
+        float percent = 1 - (--t) * t * t * t;
+        percent = MathUtil.INSTANCE.clamp(percent, 0F, 1F);
+
         if (this.mc.gameSettings.chatVisibility != EntityPlayer.EnumChatVisibility.HIDDEN)
         {
             int i = this.getLineCount();
@@ -47,7 +69,7 @@ public class GuiNewChat extends Gui
                 float f1 = this.getChatScale();
                 int l = MathHelper.ceiling_float_int((float)this.getChatWidth() / f1);
                 GlStateManager.pushMatrix();
-                GlStateManager.translate(2.0F, 20.0F, 0.0F);
+                GlStateManager.translate(2.0F, 20.0F + (9 - 9 * percent) * f1, 0.0F);
                 GlStateManager.scale(f1, f1, 1.0F);
 
                 for (int i1 = 0; i1 + this.scrollPos < this.drawnChatLines.size() && i1 < i; ++i1)
@@ -127,6 +149,7 @@ public class GuiNewChat extends Gui
 
     public void printChatMessageWithOptionalDeletion(IChatComponent chatComponent, int chatLineId)
     {
+        percentage = 0.0F;
         this.setChatLine(chatComponent, chatLineId, this.mc.ingameGUI.getUpdateCounter(), false);
         logger.info("[CHAT] " + chatComponent.getUnformattedText());
     }
@@ -153,7 +176,9 @@ public class GuiNewChat extends Gui
             this.drawnChatLines.add(0, new ChatLine(updateCounter, ichatcomponent, chatLineId));
         }
 
-        while (this.drawnChatLines.size() > 100)
+        int maxSize = 1000;
+
+        while (this.drawnChatLines.size() > maxSize)
         {
             this.drawnChatLines.remove(this.drawnChatLines.size() - 1);
         }
@@ -162,7 +187,7 @@ public class GuiNewChat extends Gui
         {
             this.chatLines.add(0, new ChatLine(updateCounter, chatComponent, chatLineId));
 
-            while (this.chatLines.size() > 100)
+            while (this.chatLines.size() > maxSize)
             {
                 this.chatLines.remove(this.chatLines.size() - 1);
             }

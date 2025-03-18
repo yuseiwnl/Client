@@ -2566,7 +2566,7 @@ public class RenderGlobal implements IWorldAccess, IResourceManagerReloadListene
         {
             GlStateManager.enableBlend();
             GlStateManager.tryBlendFuncSeparate(770, 771, 1, 0);
-            GlStateManager.color(0.0F, 0.0F, 0.0F, 0.4F);
+            GlStateManager.color(255.0F, 255.0F, 255.0F, 1.0F);
             GL11.glLineWidth(2.0F);
             GlStateManager.disableTexture2D();
 

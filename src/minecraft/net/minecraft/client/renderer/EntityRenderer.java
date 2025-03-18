@@ -10,6 +10,12 @@ import java.util.Date;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.Callable;
+
+import jp.client.Client;
+import jp.client.event.MouseOverEvent;
+import jp.client.event.MouseRotationEvent;
+import jp.client.event.Render3DEvent;
+import jp.client.module.impl.visual.Camera;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockBed;
 import net.minecraft.block.material.Material;
@@ -407,7 +413,13 @@ public class EntityRenderer implements IResourceManagerReloadListener
             this.mc.mcProfiler.startSection("pick");
             this.mc.pointedEntity = null;
             double d0 = (double)this.mc.playerController.getBlockReachDistance();
-            this.mc.objectMouseOver = entity.rayTrace(d0, partialTicks);
+
+            double reach = 3.0D;
+            MouseOverEvent event = new MouseOverEvent(entity.rayTrace(d0, partialTicks), reach);
+            Client.INSTANCE.getEventBus().post(event);
+
+            this.mc.objectMouseOver = event.getMovingObjectPosition();
+            reach = event.getRange();
             double d1 = d0;
             Vec3 vec3 = entity.getPositionEyes(partialTicks);
             boolean flag = false;
@@ -418,7 +430,7 @@ public class EntityRenderer implements IResourceManagerReloadListener
                 d0 = 6.0D;
                 d1 = 6.0D;
             }
-            else if (d0 > 3.0D)
+            else if (d0 > 3.0D || reach > 3.0D)
             {
                 flag = true;
             }
@@ -489,7 +501,7 @@ public class EntityRenderer implements IResourceManagerReloadListener
                 }
             }
 
-            if (this.pointedEntity != null && flag && vec3.distanceTo(vec33) > 3.0D)
+            if (this.pointedEntity != null && flag && vec3.distanceTo(vec33) > reach)
             {
                 this.pointedEntity = null;
                 this.mc.objectMouseOver = new MovingObjectPosition(MovingObjectPosition.MovingObjectType.MISS, vec33, (EnumFacing)null, new BlockPos(vec33));
@@ -715,7 +727,7 @@ public class EntityRenderer implements IResourceManagerReloadListener
                     {
                         double d7 = movingobjectposition.hitVec.distanceTo(new Vec3(d0, d1, d2));
 
-                        if (d7 < d3)
+                        if (!Client.moduleManager.get(Camera.class).isToggled() && d7 < d3)
                         {
                             d3 = d7;
                         }
@@ -1201,8 +1213,12 @@ public class EntityRenderer implements IResourceManagerReloadListener
             this.mc.mouseHelper.mouseXYChange();
             float f = this.mc.gameSettings.mouseSensitivity * 0.6F + 0.2F;
             float f1 = f * f * f * 8.0F;
-            float f2 = (float)this.mc.mouseHelper.deltaX * f1;
-            float f3 = (float)this.mc.mouseHelper.deltaY * f1;
+
+            MouseRotationEvent event = new MouseRotationEvent((float) this.mc.mouseHelper.deltaX, (float) this.mc.mouseHelper.deltaY);
+            Client.eventBus.post(event);
+
+            float f2 = event.getDeltaX() * f1;
+            float f3 = event.getDeltaY() * f1;
             int i = 1;
 
             if (this.mc.gameSettings.invertMouse)
@@ -1805,6 +1821,8 @@ public class EntityRenderer implements IResourceManagerReloadListener
             this.mc.mcProfiler.endStartSection("aboveClouds");
             this.renderCloudsCheck(renderglobal, partialTicks, pass);
         }
+
+        Client.INSTANCE.getEventBus().post(new Render3DEvent(partialTicks));
 
         if (Reflector.ForgeHooksClient_dispatchRenderLast.exists())
         {

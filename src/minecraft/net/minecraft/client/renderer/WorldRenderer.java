@@ -9,6 +9,10 @@ import java.nio.ShortBuffer;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Comparator;
+
+import jp.client.Client;
+import jp.client.module.impl.visual.Xray;
+import jp.client.util.render.ColorUtil;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.renderer.vertex.VertexFormat;
@@ -434,11 +438,17 @@ public class WorldRenderer
         {
             j = this.rawIntBuffer.get(i);
 
+            Xray xray = Client.moduleManager.get(Xray.class);
+
             if (ByteOrder.nativeOrder() == ByteOrder.LITTLE_ENDIAN)
             {
                 int k = (int)((float)(j & 255) * red);
                 int l = (int)((float)(j >> 8 & 255) * green);
                 int i1 = (int)((float)(j >> 16 & 255) * blue);
+
+                if (xray.isToggled())
+                    j = ColorUtil.INSTANCE.getColor(k, l, i1, 100);
+
                 j = j & -16777216;
                 j = j | i1 << 16 | l << 8 | k;
             }
@@ -447,6 +457,10 @@ public class WorldRenderer
                 int j1 = (int)((float)(j >> 24 & 255) * red);
                 int k1 = (int)((float)(j >> 16 & 255) * green);
                 int l1 = (int)((float)(j >> 8 & 255) * blue);
+
+                if (xray.isToggled())
+                    j = ColorUtil.INSTANCE.getColor(j1, k1, l1, 100);
+
                 j = j & 255;
                 j = j | j1 << 24 | k1 << 16 | l1 << 8;
             }

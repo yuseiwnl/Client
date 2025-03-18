@@ -1,5 +1,10 @@
 package net.minecraft.client.multiplayer;
 
+import jp.client.Client;
+import jp.client.event.AttackEvent;
+import jp.client.event.BlockBreakEvent;
+import jp.client.event.BlockDamageEvent;
+import jp.client.module.impl.player.FastMine;
 import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
 import net.minecraft.block.state.IBlockState;
@@ -205,6 +210,9 @@ public class PlayerControllerMP
 
                 if (flag && this.curBlockDamageMP == 0.0F)
                 {
+                    BlockDamageEvent blockDamageEvent = new BlockDamageEvent(loc);
+                    Client.INSTANCE.getEventBus().post(blockDamageEvent);
+
                     block1.onBlockClicked(this.mc.theWorld, loc, this.mc.thePlayer);
                 }
 
@@ -276,12 +284,15 @@ public class PlayerControllerMP
 
                 if (this.curBlockDamageMP >= 1.0F)
                 {
+                    BlockBreakEvent event = new BlockBreakEvent(posBlock);
+                    Client.INSTANCE.getEventBus().post(event);
+
                     this.isHittingBlock = false;
                     this.netClientHandler.addToSendQueue(new C07PacketPlayerDigging(C07PacketPlayerDigging.Action.STOP_DESTROY_BLOCK, posBlock, directionFacing));
                     this.onPlayerDestroyBlock(posBlock, directionFacing);
                     this.curBlockDamageMP = 0.0F;
                     this.stepSoundTickCounter = 0.0F;
-                    this.blockHitDelay = 5;
+                    this.blockHitDelay = Client.moduleManager.get(FastMine.class).isToggled() ? 4 : 5;
                 }
 
                 this.mc.theWorld.sendBlockBreakProgress(this.mc.thePlayer.getEntityId(), this.currentBlock, (int)(this.curBlockDamageMP * 10.0F) - 1);
@@ -439,6 +450,9 @@ public class PlayerControllerMP
     public void attackEntity(EntityPlayer playerIn, Entity targetEntity)
     {
         this.syncCurrentPlayItem();
+
+        Client.INSTANCE.getEventBus().post(new AttackEvent(targetEntity));
+
         this.netClientHandler.addToSendQueue(new C02PacketUseEntity(targetEntity, C02PacketUseEntity.Action.ATTACK));
 
         if (this.currentGameType != WorldSettings.GameType.SPECTATOR)

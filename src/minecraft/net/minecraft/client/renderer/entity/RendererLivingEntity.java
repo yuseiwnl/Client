@@ -3,6 +3,10 @@ package net.minecraft.client.renderer.entity;
 import com.google.common.collect.Lists;
 import java.nio.FloatBuffer;
 import java.util.List;
+
+import jp.client.Client;
+import jp.client.event.RenderLivingEvent;
+import jp.client.event.RenderNameEvent;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.EntityPlayerSP;
 import net.minecraft.client.gui.FontRenderer;
@@ -100,6 +104,9 @@ public abstract class RendererLivingEntity<T extends EntityLivingBase> extends R
 
     public void doRender(T entity, double x, double y, double z, float entityYaw, float partialTicks)
     {
+        RenderLivingEvent event = new RenderLivingEvent(entity, RenderLivingEvent.State.PRE);
+        Client.eventBus.post(event);
+
         if (!Reflector.RenderLivingEvent_Pre_Constructor.exists() || !Reflector.postForgeBusEvent(Reflector.RenderLivingEvent_Pre_Constructor, new Object[] {entity, this, Double.valueOf(x), Double.valueOf(y), Double.valueOf(z)}))
         {
             if (animateModelLiving)
@@ -276,6 +283,9 @@ public abstract class RendererLivingEntity<T extends EntityLivingBase> extends R
             {
                 Reflector.postForgeBusEvent(Reflector.RenderLivingEvent_Post_Constructor, new Object[] {entity, this, Double.valueOf(x), Double.valueOf(y), Double.valueOf(z)});
             }
+
+            event = new RenderLivingEvent(entity, RenderLivingEvent.State.POST);
+            Client.INSTANCE.getEventBus().post(event);
         }
     }
 
@@ -601,7 +611,10 @@ public abstract class RendererLivingEntity<T extends EntityLivingBase> extends R
 
     public void renderName(T entity, double x, double y, double z)
     {
-        if (!Reflector.RenderLivingEvent_Specials_Pre_Constructor.exists() || !Reflector.postForgeBusEvent(Reflector.RenderLivingEvent_Specials_Pre_Constructor, new Object[] {entity, this, Double.valueOf(x), Double.valueOf(y), Double.valueOf(z)}))
+        RenderNameEvent event = new RenderNameEvent(entity, RenderNameEvent.State.PRE);
+        Client.INSTANCE.getEventBus().post(event);
+
+        if (!event.getCanceled())
         {
             if (this.canRenderName(entity))
             {
@@ -658,6 +671,9 @@ public abstract class RendererLivingEntity<T extends EntityLivingBase> extends R
                 Reflector.postForgeBusEvent(Reflector.RenderLivingEvent_Specials_Post_Constructor, new Object[] {entity, this, Double.valueOf(x), Double.valueOf(y), Double.valueOf(z)});
             }
         }
+
+        event = new RenderNameEvent(entity, RenderNameEvent.State.POST);
+        Client.INSTANCE.getEventBus().post(event);
     }
 
     protected boolean canRenderName(T entity)

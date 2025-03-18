@@ -9,9 +9,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
+
+import jp.client.Client;
+import jp.client.event.JumpEvent;
+import jp.client.event.MinimumMotionEvent;
+import jp.client.module.impl.movement.NoJumpDelay;
+import jp.client.module.impl.other.Derp;
 import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
 import net.minecraft.block.state.IBlockState;
+import net.minecraft.client.Minecraft;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.entity.ai.attributes.AttributeModifier;
 import net.minecraft.entity.ai.attributes.BaseAttributeMap;
@@ -1331,9 +1338,17 @@ public abstract class EntityLivingBase extends Entity
             this.motionY += (double)((float)(this.getActivePotionEffect(Potion.jump).getAmplifier() + 1) * 0.1F);
         }
 
+        float yaw = this.rotationYaw;
+        if (this == Minecraft.getMinecraft().thePlayer) {
+            JumpEvent jumpEvent = new JumpEvent(this.rotationYaw);
+            Client.INSTANCE.getEventBus().post(jumpEvent);
+
+            yaw = jumpEvent.getYaw();
+        }
+
         if (this.isSprinting())
         {
-            float f = this.rotationYaw * 0.017453292F;
+            float f = yaw * 0.017453292F;
             this.motionX -= (double)(MathHelper.sin(f) * 0.2F);
             this.motionZ += (double)(MathHelper.cos(f) * 0.2F);
         }
@@ -1652,7 +1667,9 @@ public abstract class EntityLivingBase extends Entity
     protected float updateDistance(float p_110146_1_, float p_110146_2_)
     {
         float f = MathHelper.wrapAngleTo180_float(p_110146_1_ - this.renderYawOffset);
-        this.renderYawOffset += f * 0.3F;
+
+        boolean player = Client.INSTANCE.getModuleManager().get(Derp.class).isToggled() && this == Minecraft.getMinecraft().thePlayer;
+        this.renderYawOffset += player ? f : f * 0.3F;
         float f1 = MathHelper.wrapAngleTo180_float(this.rotationYaw - this.renderYawOffset);
         boolean flag = f1 < -90.0F || f1 >= 90.0F;
 
@@ -1666,7 +1683,7 @@ public abstract class EntityLivingBase extends Entity
             f1 = 75.0F;
         }
 
-        this.renderYawOffset = this.rotationYaw - f1;
+        this.renderYawOffset = player ? this.rotationYaw : this.rotationYaw - f1;
 
         if (f1 * f1 > 2500.0F)
         {
@@ -1707,17 +1724,24 @@ public abstract class EntityLivingBase extends Entity
             this.motionZ *= 0.98D;
         }
 
-        if (Math.abs(this.motionX) < 0.005D)
+        double minimumMotion = 0.005D;
+        if (this == Minecraft.getMinecraft().thePlayer) {
+            MinimumMotionEvent minimumMotionEvent = new MinimumMotionEvent(minimumMotion);
+            Client.INSTANCE.getEventBus().post(minimumMotionEvent);
+            minimumMotion = minimumMotionEvent.getMotion();
+        }
+
+        if (Math.abs(this.motionX) < minimumMotion)
         {
             this.motionX = 0.0D;
         }
 
-        if (Math.abs(this.motionY) < 0.005D)
+        if (Math.abs(this.motionY) < minimumMotion)
         {
             this.motionY = 0.0D;
         }
 
-        if (Math.abs(this.motionZ) < 0.005D)
+        if (Math.abs(this.motionZ) < minimumMotion)
         {
             this.motionZ = 0.0D;
         }
@@ -1754,7 +1778,7 @@ public abstract class EntityLivingBase extends Entity
             else if (this.onGround && this.jumpTicks == 0)
             {
                 this.jump();
-                this.jumpTicks = 10;
+                this.jumpTicks = (this == Minecraft.getMinecraft().thePlayer) && Client.moduleManager.get(NoJumpDelay.class).isToggled() ? 3 : 10;
             }
         }
         else

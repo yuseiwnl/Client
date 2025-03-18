@@ -157,7 +157,7 @@ public class GuiPlayerTabOverlay extends Gui
             if (k4 < list.size())
             {
                 NetworkPlayerInfo networkplayerinfo1 = (NetworkPlayerInfo)list.get(k4);
-                String s1 = this.getPlayerName(networkplayerinfo1);
+                String s1 = this.getPlayerName(networkplayerinfo1).replaceAll("§k", "");;
                 GameProfile gameprofile = networkplayerinfo1.getGameProfile();
 
                 if (flag)

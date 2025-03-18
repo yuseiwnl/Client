@@ -2,6 +2,13 @@ package net.minecraft.network;
 
 import com.google.common.collect.Queues;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.viaversion.viaversion.api.connection.UserConnection;
+import com.viaversion.viaversion.connection.UserConnectionImpl;
+import com.viaversion.viaversion.protocol.ProtocolPipelineImpl;
+import de.florianmichael.vialoadingbase.ViaLoadingBase;
+import de.florianmichael.vialoadingbase.netty.event.CompressionReorderEvent;
+import de.florianmichael.viamcp.MCPVLBPipeline;
+import de.florianmichael.viamcp.ViaMCP;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelException;
@@ -32,6 +39,9 @@ import java.net.SocketAddress;
 import java.util.Queue;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.crypto.SecretKey;
+
+import jp.client.Client;
+import jp.client.event.PacketEvent;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.ChatComponentTranslation;
 import net.minecraft.util.CryptManager;
@@ -141,7 +151,34 @@ public class NetworkManager extends SimpleChannelInboundHandler<Packet>
         {
             try
             {
+                PacketEvent event = new PacketEvent(p_channelRead0_2_, PacketEvent.State.RECEIVE);
+                Client.INSTANCE.getEventBus().post(event);
+
+                if (event.getCanceled())
+                    return;
+
                 p_channelRead0_2_.processPacket(this.packetListener);
+            }
+            catch (ThreadQuickExitException var4)
+            {
+                ;
+            }
+        }
+    }
+
+    public void recievePacket(Packet packet) throws Exception
+    {
+        if (this.channel.isOpen())
+        {
+            try
+            {
+                PacketEvent event = new PacketEvent(packet, PacketEvent.State.RECEIVE);
+                Client.INSTANCE.getEventBus().post(event);
+
+                if (event.getCanceled())
+                    return;
+
+                packet.processPacket(this.packetListener);
             }
             catch (ThreadQuickExitException var4)
             {
@@ -158,6 +195,35 @@ public class NetworkManager extends SimpleChannelInboundHandler<Packet>
     }
 
     public void sendPacket(Packet packetIn)
+    {
+        if (this.isChannelOpen())
+        {
+            PacketEvent event = new PacketEvent(packetIn, PacketEvent.State.SEND);
+            Client.INSTANCE.getEventBus().post(event);
+
+            if (event.getCanceled()) {
+                return;
+            }
+
+            this.flushOutboundQueue();
+            this.dispatchPacket(packetIn, (GenericFutureListener <? extends Future <? super Void >> [])null);
+        }
+        else
+        {
+            this.readWriteLock.writeLock().lock();
+
+            try
+            {
+                this.outboundPacketsQueue.add(new NetworkManager.InboundHandlerTuplePacketListener(packetIn, (GenericFutureListener[])null));
+            }
+            finally
+            {
+                this.readWriteLock.writeLock().unlock();
+            }
+        }
+    }
+
+    public void sendPacketNoEvent(Packet packetIn)
     {
         if (this.isChannelOpen())
         {
@@ -335,6 +401,13 @@ public class NetworkManager extends SimpleChannelInboundHandler<Packet>
                 }
 
                 p_initChannel_1_.pipeline().addLast((String)"timeout", (ChannelHandler)(new ReadTimeoutHandler(30))).addLast((String)"splitter", (ChannelHandler)(new MessageDeserializer2())).addLast((String)"decoder", (ChannelHandler)(new MessageDeserializer(EnumPacketDirection.CLIENTBOUND))).addLast((String)"prepender", (ChannelHandler)(new MessageSerializer2())).addLast((String)"encoder", (ChannelHandler)(new MessageSerializer(EnumPacketDirection.SERVERBOUND))).addLast((String)"packet_handler", (ChannelHandler)networkmanager);
+
+                if (p_initChannel_1_ instanceof SocketChannel && ViaLoadingBase.getInstance().getTargetVersion().getVersion() != ViaMCP.NATIVE_VERSION) {
+                    final UserConnection user = new UserConnectionImpl(p_initChannel_1_, true);
+                    new ProtocolPipelineImpl(user);
+
+                    p_initChannel_1_.pipeline().addLast(new MCPVLBPipeline(user));
+                }
             }
         })).channel(oclass)).connect(address, serverPort).syncUninterruptibly();
         return networkmanager;
@@ -424,6 +497,8 @@ public class NetworkManager extends SimpleChannelInboundHandler<Packet>
                 this.channel.pipeline().remove("compress");
             }
         }
+
+        this.channel.pipeline().fireUserEventTriggered(new CompressionReorderEvent());
     }
 
     public void checkDisconnected()

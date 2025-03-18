@@ -1,5 +1,7 @@
 package net.minecraft.client.renderer;
 
+import jp.client.Client;
+import jp.client.event.RenderItemEvent;
 import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
 import net.minecraft.block.state.IBlockState;
@@ -260,6 +262,9 @@ public class ItemRenderer
 
     private void transformFirstPersonItem(float equipProgress, float swingProgress)
     {
+        if (mc.thePlayer.isSwingInProgress)
+            GlStateManager.scale(0.85F, 0.85F, 0.85F);
+
         GlStateManager.translate(0.56F, -0.52F, -0.71999997F);
         GlStateManager.translate(0.0F, equipProgress * -0.6F, 0.0F);
         GlStateManager.rotate(45.0F, 0.0F, 1.0F, 0.0F);
@@ -304,6 +309,9 @@ public class ItemRenderer
         GlStateManager.rotate(30.0F, 0.0F, 1.0F, 0.0F);
         GlStateManager.rotate(-80.0F, 1.0F, 0.0F, 0.0F);
         GlStateManager.rotate(60.0F, 0.0F, 1.0F, 0.0F);
+
+        GlStateManager.scale(0.83F, 0.88F, 0.85F);
+        GlStateManager.translate(-0.3F, 0.1F, 0.0F);
     }
 
     public void renderItemInFirstPerson(float partialTicks)
@@ -323,13 +331,16 @@ public class ItemRenderer
 
             if (this.itemToRender != null)
             {
+                RenderItemEvent event = new RenderItemEvent(this.itemToRender.getItemUseAction(), abstractclientplayer.getItemInUseCount() > 0);
+                Client.eventBus.post(event);
+
                 if (this.itemToRender.getItem() instanceof ItemMap)
                 {
                     this.renderItemMap(abstractclientplayer, f2, f, f1);
                 }
-                else if (abstractclientplayer.getItemInUseCount() > 0)
+                else if (event.getUseItem())
                 {
-                    EnumAction enumaction = this.itemToRender.getItemUseAction();
+                    EnumAction enumaction = event.getEnumAction();
 
                     switch (enumaction)
                     {
@@ -340,16 +351,16 @@ public class ItemRenderer
                         case EAT:
                         case DRINK:
                             this.performDrinking(abstractclientplayer, partialTicks);
-                            this.transformFirstPersonItem(f, 0.0F);
+                            this.transformFirstPersonItem(f, f1);
                             break;
 
                         case BLOCK:
-                            this.transformFirstPersonItem(f, 0.0F);
+                            this.transformFirstPersonItem(f, f1);
                             this.doBlockTransformations();
                             break;
 
                         case BOW:
-                            this.transformFirstPersonItem(f, 0.0F);
+                            this.transformFirstPersonItem(f, f1);
                             this.doBowTransformations(partialTicks, abstractclientplayer);
                     }
                 }

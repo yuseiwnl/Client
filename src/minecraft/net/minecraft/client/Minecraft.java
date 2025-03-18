@@ -35,6 +35,16 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
 import javax.imageio.ImageIO;
+
+import com.viaversion.viaversion.api.protocol.version.ProtocolVersion;
+import de.florianmichael.vialoadingbase.ViaLoadingBase;
+import de.florianmichael.viamcp.fixes.AttackOrder;
+import jp.client.Client;
+import jp.client.event.KeyEvent;
+import jp.client.event.LoadWorldEvent;
+import jp.client.event.TickEvent;
+import jp.client.module.impl.player.FastPlace;
+import jp.client.ui.MainMenu;
 import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
 import net.minecraft.client.audio.MusicTicker;
@@ -206,7 +216,7 @@ public class Minecraft implements IThreadListener, IPlayerUsage
     public int displayWidth;
     public int displayHeight;
     private boolean connectedToRealms = false;
-    private Timer timer = new Timer(20.0F);
+    public Timer timer = new Timer(20.0F);
     private PlayerUsageSnooper usageSnooper = new PlayerUsageSnooper("client", this, MinecraftServer.getCurrentTimeMillis());
     public WorldClient theWorld;
     public RenderGlobal renderGlobal;
@@ -217,7 +227,7 @@ public class Minecraft implements IThreadListener, IPlayerUsage
     private Entity renderViewEntity;
     public Entity pointedEntity;
     public EffectRenderer effectRenderer;
-    private final Session session;
+    public Session session; //private final Session session;
     private boolean isGamePaused;
     public FontRenderer fontRendererObj;
     public FontRenderer standardGalacticFontRenderer;
@@ -240,7 +250,7 @@ public class Minecraft implements IThreadListener, IPlayerUsage
     private final Proxy proxy;
     private ISaveFormat saveLoader;
     private static int debugFPS;
-    private int rightClickDelayTimer;
+    public int rightClickDelayTimer;
     private String serverName;
     private int serverPort;
     public boolean inGameHasFocus;
@@ -486,13 +496,15 @@ public class Minecraft implements IThreadListener, IPlayerUsage
         this.checkGLError("Post startup");
         this.ingameGUI = new GuiIngame(this);
 
+        Client.INSTANCE.init();
+
         if (this.serverName != null)
         {
             this.displayGuiScreen(new GuiConnecting(new GuiMainMenu(), this, this.serverName, this.serverPort));
         }
         else
         {
-            this.displayGuiScreen(new GuiMainMenu());
+            this.displayGuiScreen(new MainMenu());
         }
 
         this.renderEngine.deleteTexture(this.mojangLogo);
@@ -1137,6 +1149,10 @@ public class Minecraft implements IThreadListener, IPlayerUsage
 
     public int getLimitFramerate()
     {
+        if (!Display.isActive()) {
+            return 30;
+        }
+
         return this.theWorld == null && this.currentScreen != null ? 30 : this.gameSettings.limitFramerate;
     }
 
@@ -1330,6 +1346,15 @@ public class Minecraft implements IThreadListener, IPlayerUsage
             {
                 this.inGameHasFocus = true;
                 this.mouseHelper.grabMouseCursor();
+
+                for (KeyBinding keybinding : KeyBinding.keybindArray) {
+                    try {
+                        final int keyCode = keybinding.getKeyCode();
+                        KeyBinding.setKeyBindState(keyCode, keyCode < 256 && Keyboard.isKeyDown(keyCode));
+                    } catch (IndexOutOfBoundsException ignored) {
+                    }
+                }
+
                 this.displayGuiScreen((GuiScreen)null);
                 this.leftClickCounter = 10000;
             }
@@ -1366,11 +1391,14 @@ public class Minecraft implements IThreadListener, IPlayerUsage
             this.leftClickCounter = 0;
         }
 
-        if (this.leftClickCounter <= 0 && !this.thePlayer.isUsingItem())
+        if (this.leftClickCounter <= 0) // && !this.thePlayer.isUsingItem())
         {
             if (leftClick && this.objectMouseOver != null && this.objectMouseOver.typeOfHit == MovingObjectPosition.MovingObjectType.BLOCK)
             {
                 BlockPos blockpos = this.objectMouseOver.getBlockPos();
+
+                if (this.thePlayer.isUsingItem() && ViaLoadingBase.getInstance().getTargetVersion().newerThanOrEqualTo(ProtocolVersion.v1_8))
+                    return;
 
                 if (this.theWorld.getBlockState(blockpos).getBlock().getMaterial() != Material.air && this.playerController.onPlayerDamageBlock(blockpos, this.objectMouseOver.sideHit))
                 {
@@ -1389,7 +1417,8 @@ public class Minecraft implements IThreadListener, IPlayerUsage
     {
         if (this.leftClickCounter <= 0)
         {
-            this.thePlayer.swingItem();
+            //this.thePlayer.swingItem();
+            AttackOrder.sendConditionalSwing(this.objectMouseOver);
 
             if (this.objectMouseOver == null)
             {
@@ -1405,7 +1434,8 @@ public class Minecraft implements IThreadListener, IPlayerUsage
                 switch (this.objectMouseOver.typeOfHit)
                 {
                     case ENTITY:
-                        this.playerController.attackEntity(this.thePlayer, this.objectMouseOver.entityHit);
+                        //this.playerController.attackEntity(this.thePlayer, this.objectMouseOver.entityHit);
+                        AttackOrder.sendFixedAttack(this.thePlayer, this.objectMouseOver.entityHit);
                         break;
 
                     case BLOCK:
@@ -1421,7 +1451,7 @@ public class Minecraft implements IThreadListener, IPlayerUsage
                     default:
                         if (this.playerController.isNotCreative())
                         {
-                            this.leftClickCounter = 10;
+                            this.leftClickCounter = 0;
                         }
                 }
             }
@@ -1431,9 +1461,9 @@ public class Minecraft implements IThreadListener, IPlayerUsage
     @SuppressWarnings("incomplete-switch")
     private void rightClickMouse()
     {
-        if (!this.playerController.getIsHittingBlock())
+        if (!this.playerController.getIsHittingBlock() || !(this.thePlayer.inventory.getCurrentItem() == null || (this.thePlayer.inventory.getCurrentItem() != null && this.thePlayer.inventory.getCurrentItem().getItem() instanceof ItemBlock)))
         {
-            this.rightClickDelayTimer = 4;
+            this.rightClickDelayTimer = Client.moduleManager.get(FastPlace.class).canFastPlace() ? 1 : 4;
             boolean flag = true;
             ItemStack itemstack = this.thePlayer.inventory.getCurrentItem();
 
@@ -1590,6 +1620,8 @@ public class Minecraft implements IThreadListener, IPlayerUsage
 
     public void runTick() throws IOException
     {
+        Client.INSTANCE.getEventBus().post(new TickEvent());
+
         if (this.rightClickDelayTimer > 0)
         {
             --this.rightClickDelayTimer;
@@ -1782,6 +1814,8 @@ public class Minecraft implements IThreadListener, IPlayerUsage
 
                 if (Keyboard.getEventKeyState())
                 {
+                    Client.INSTANCE.getEventBus().post(new KeyEvent(k));
+
                     if (k == 62 && this.entityRenderer != null)
                     {
                         this.entityRenderer.switchUseShader();
@@ -2194,6 +2228,8 @@ public class Minecraft implements IThreadListener, IPlayerUsage
 
     public void loadWorld(WorldClient worldClientIn, String loadingMessage)
     {
+        Client.eventBus.post(new LoadWorldEvent());
+
         if (worldClientIn == null)
         {
             NetHandlerPlayClient nethandlerplayclient = this.getNetHandler();
@@ -2264,7 +2300,6 @@ public class Minecraft implements IThreadListener, IPlayerUsage
             this.thePlayer = null;
         }
 
-        System.gc();
         this.systemTime = 0L;
     }
 

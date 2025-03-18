@@ -1,5 +1,7 @@
 package net.minecraft.block;
 
+import com.viaversion.viaversion.api.protocol.version.ProtocolVersion;
+import de.florianmichael.vialoadingbase.ViaLoadingBase;
 import net.minecraft.block.material.Material;
 import net.minecraft.block.properties.IProperty;
 import net.minecraft.block.properties.PropertyDirection;
@@ -43,7 +45,7 @@ public class BlockLadder extends Block
 
         if (iblockstate.getBlock() == this)
         {
-            float f = 0.125F;
+            float f = ViaLoadingBase.getInstance().getTargetVersion().newerThan(ProtocolVersion.v1_8) ? 0.1875F : 0.125F;
 
             switch ((EnumFacing)iblockstate.getValue(FACING))
             {

@@ -4,6 +4,10 @@ import java.util.List;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+
+import jp.client.Client;
+import jp.client.event.GetCollisionBorderSizeEvent;
+import jp.client.event.StrafeEvent;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockFence;
 import net.minecraft.block.BlockFenceGate;
@@ -12,6 +16,7 @@ import net.minecraft.block.BlockWall;
 import net.minecraft.block.material.Material;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.block.state.pattern.BlockPattern;
+import net.minecraft.client.Minecraft;
 import net.minecraft.command.CommandResultStats;
 import net.minecraft.command.ICommandSender;
 import net.minecraft.crash.CrashReport;
@@ -1009,6 +1014,18 @@ public abstract class Entity implements ICommandSender
 
     public void moveFlying(float strafe, float forward, float friction)
     {
+        float yaw = this.rotationYaw;
+
+        if (this == Minecraft.getMinecraft().thePlayer) {
+            StrafeEvent event = new StrafeEvent(strafe, forward, friction, yaw);
+            Client.eventBus.post(event);
+
+            strafe = event.getStrafe();
+            forward = event.getForward();
+            friction = event.getFriction();
+            yaw = event.getYaw();
+        }
+
         float f = strafe * strafe + forward * forward;
 
         if (f >= 1.0E-4F)
@@ -1023,8 +1040,8 @@ public abstract class Entity implements ICommandSender
             f = friction / f;
             strafe = strafe * f;
             forward = forward * f;
-            float f1 = MathHelper.sin(this.rotationYaw * (float)Math.PI / 180.0F);
-            float f2 = MathHelper.cos(this.rotationYaw * (float)Math.PI / 180.0F);
+            float f1 = MathHelper.sin(yaw * (float)Math.PI / 180.0F);
+            float f2 = MathHelper.cos(yaw * (float)Math.PI / 180.0F);
             this.motionX += (double)(strafe * f2 - forward * f1);
             this.motionZ += (double)(forward * f2 + strafe * f1);
         }
@@ -1704,7 +1721,10 @@ public abstract class Entity implements ICommandSender
 
     public float getCollisionBorderSize()
     {
-        return 0.1F;
+        GetCollisionBorderSizeEvent event = new GetCollisionBorderSizeEvent(this, 0.1F);
+        Client.eventBus.post(event);
+
+        return event.getSize();
     }
 
     public Vec3 getLookVec()

@@ -1,6 +1,9 @@
 package net.minecraft.block;
 
 import java.util.Random;
+
+import jp.client.Client;
+import jp.client.module.impl.visual.Xray;
 import net.minecraft.block.material.Material;
 import net.minecraft.block.properties.IProperty;
 import net.minecraft.block.properties.PropertyBool;
@@ -146,7 +149,7 @@ public class BlockGrass extends Block implements IGrowable
 
     public EnumWorldBlockLayer getBlockLayer()
     {
-        return EnumWorldBlockLayer.CUTOUT_MIPPED;
+        return Client.moduleManager.get(Xray.class).isToggled() ? EnumWorldBlockLayer.TRANSLUCENT : EnumWorldBlockLayer.CUTOUT_MIPPED;
     }
 
     public int getMetaFromState(IBlockState state)
